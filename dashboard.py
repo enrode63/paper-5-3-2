@@ -1,6 +1,5 @@
 """
 dashboard.py — state.json → index.html (웹 대시보드 생성)
-GitHub Pages로 서빙. 자산곡선(Chart.js) + 포지션 + 매매일지 + 통계.
 """
 import os, json, datetime as dt
 
@@ -15,14 +14,12 @@ def build():
     eq = st["equity"]; ret = (eq/BASE-1)*100
     hist = st["history"]
     labels = [h[0] for h in hist]; values = [h[1] for h in hist]
-    # 최대낙폭
     peak = -1e9; mdd = 0
     for v in values:
         peak = max(peak, v); mdd = min(mdd, v/peak-1)
     mdd *= 100
     color = "#16c784" if ret >= 0 else "#ea3943"
 
-    # 포지션 행
     pos_rows = ""
     for c, p in st["positions"].items():
         if abs(p) > 1:
@@ -32,12 +29,20 @@ def build():
     if not pos_rows:
         pos_rows = "<tr><td colspan=3 style='color:#888'>포지션 없음</td></tr>"
 
-    # 매매일지 (최근 15)
     tr_rows = ""
     for t in reversed(st["trades"][-15:]):
         tr_rows += f"<tr><td>{t['t']}</td><td>{t['coin']}</td><td>{t['act']}</td><td>{t['notional']:+,}원</td></tr>"
     if not tr_rows:
         tr_rows = "<tr><td colspan=4 style='color:#888'>거래 없음</td></tr>"
+
+    ep = st.get("eng_pnl", {"carry":0,"turtle":0,"momentum":0})
+    sleeve = {"carry": BASE*0.50, "turtle": BASE*0.30, "momentum": BASE*0.20}
+    names = {"carry": "캐리 50%", "turtle": "터틀 30%", "momentum": "모멘텀 20%"}
+    eng_rows = ""
+    for e in ["carry", "turtle", "momentum"]:
+        pnl = ep.get(e, 0); pct = pnl/sleeve[e]*100 if sleeve[e] else 0
+        ec = "#16c784" if pnl >= 0 else "#ea3943"
+        eng_rows += f"<tr><td>{names[e]}</td><td style='color:{ec}'>{pnl:+,.0f}원</td><td style='color:{ec}'>{pct:+.2f}%</td></tr>"
 
     mm = st.get("momentum", {})
     scores = mm.get("scores", {})
@@ -69,6 +74,8 @@ canvas{{max-height:260px}}
   <div class=card><div class=l>기준자본</div><div class=v>{BASE:,}원</div></div>
 </div>
 <div class=box><canvas id=eq></canvas></div>
+<h3>전략별 수익률</h3>
+<table><tr><th>전략</th><th>손익</th><th>수익률</th></tr>{eng_rows}</table>
 <h3>현재 포지션</h3>
 <table><tr><th>종목</th><th>방향</th><th>명목</th></tr>{pos_rows}</table>
 <div class=sub>모멘텀 순위(20일): {score_txt}</div>
@@ -83,7 +90,7 @@ new Chart(document.getElementById('eq'),{{type:'line',
    y:{{ticks:{{color:'#8b949e'}},grid:{{color:'#21262d'}}}}}}}}}});
 </script></body></html>"""
     open(OUT, "w", encoding="utf-8").write(html)
-    print(f"[dashboard] 생성: {OUT}  (자산 {eq:,.0f}원, 수익률 {ret:+.2f}%)")
+    print(f"[dashboard] 생성: {OUT}")
 
 
 if __name__ == "__main__":
