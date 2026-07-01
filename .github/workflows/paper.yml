@@ -1,0 +1,27 @@
+name: paper-trader
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+concurrency:
+  group: paper
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python paper_trader.py
+      - run: python dashboard.py
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "tick $(date -u +%FT%TZ)"
+          git pull --rebase --autostash || true
+          git push || true
